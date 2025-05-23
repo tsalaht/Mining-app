@@ -7,6 +7,7 @@ import {
   Icon,
   ScrollView,
   Pressable,
+  useToast,
 } from 'native-base';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../../../store/store';
@@ -14,24 +15,22 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Animated, Easing } from 'react-native';
 import Colors from '../../../Colors/Color';
-import { increaseMiningSpeed } from '../../../../store/coinSlice'; // Assumed action
+import { increaseMiningSpeed } from '../../../../store/coinSlice';
+import { upgradeService } from '../../../../app/services/api';
 
 const Upgrade = () => {
   const dispatch = useDispatch();
+  const toast = useToast();
   const { selectedCoin, miningSpeed, minedAmount } = useSelector(
     (state: RootState) => state.coin
   );
   const [glow] = useState(new Animated.Value(0));
   const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
-
-  // Sample upgrade packages
-  const upgradePackages = [
-    { id: 1, speed: 10, cost: 50 },
-    { id: 2, speed: 50, cost: 200 },
-    { id: 3, speed: 100, cost: 350 },
-  ];
+  const [loading, setLoading] = useState(false);
+  const [prices, setPrices] = useState<{ [key: string]: number }>({});
 
   useEffect(() => {
+    fetchUpgradePrices();
     // Glow animation for balance card
     Animated.loop(
       Animated.sequence([
@@ -51,24 +50,75 @@ const Upgrade = () => {
     ).start();
   }, []);
 
+  const fetchUpgradePrices = async () => {
+    try {
+      const response = await upgradeService.getUpgradePrice();
+      if (response && response.price) {
+        setPrices(response.price);
+      } else {
+        setPrices({}); // Set empty object if no prices
+      }
+    } catch (error) {
+      console.error('Error fetching upgrade prices:', error);
+      setPrices({}); // Set empty object on error
+      toast.show({
+        title: "Error",
+        description: "Failed to fetch upgrade prices",
+        variant: "solid",
+        bg: "error.500"
+      });
+    }
+  };
+
   const glowOpacity = glow.interpolate({
     inputRange: [0.3, 1],
     outputRange: [0.2, 0.8],
   });
 
-  const handlePurchase = () => {
+  const handlePurchase = async () => {
     if (selectedPackage !== null) {
-      const selected = upgradePackages.find((pkg) => pkg.id === selectedPackage);
-      if (selected) {
-        // Placeholder: Deduct cost and update speed
-        dispatch(increaseMiningSpeed(miningSpeed + selected.speed));
-        console.log(
-          `Purchased ${selected.speed} GH/s for $${selected.cost}`
-        );
-        setSelectedPackage(null); // Reset selection
+      try {
+        setLoading(true);
+        const selected = upgradePackages.find((pkg) => pkg.id === selectedPackage);
+        if (selected) {
+          // Get the coin symbol from the selected package
+          const coinSymbol = Object.keys(prices)[selectedPackage - 1];
+          const response = await upgradeService.upgrade(coinSymbol);
+          
+          // Update mining speed in Redux
+          dispatch(increaseMiningSpeed(miningSpeed + selected.speed));
+          
+          toast.show({
+            title: "Success",
+            description: `Upgraded successfully! New level: ${response.level}`,
+            variant: "solid",
+            bg: "success.500"
+          });
+          
+          setSelectedPackage(null); // Reset selection
+          await fetchUpgradePrices(); // Refresh prices
+        }
+      } catch (error) {
+        console.error('Error upgrading:', error);
+        toast.show({
+          title: "Error",
+          description: "Failed to upgrade. Please try again.",
+          variant: "solid",
+          bg: "error.500"
+        });
+      } finally {
+        setLoading(false);
       }
     }
   };
+
+  // Convert prices to upgrade packages with null check
+  const upgradePackages = prices ? Object.entries(prices).map(([coin, price], index) => ({
+    id: index + 1,
+    speed: 10 * (index + 1), // Increase speed with each level
+    cost: price,
+    coin: coin
+  })) : [];
 
   return (
     <ScrollView flex={1} bg={Colors.background}>
@@ -184,7 +234,7 @@ const Upgrade = () => {
                         fontWeight="600"
                         color={Colors.primary}
                       >
-                        ${pkg.cost}
+                        {pkg.cost} {pkg.coin}
                       </Text>
                       <Text fontSize="xs" color={Colors.success}>
                         One-time purchase
@@ -202,11 +252,11 @@ const Upgrade = () => {
           onPress={handlePurchase}
           _pressed={{ opacity: 0.7 }}
           w="100%"
-          isDisabled={selectedPackage === null}
+          isDisabled={selectedPackage === null || loading}
         >
           <LinearGradient
             colors={
-              selectedPackage === null
+              selectedPackage === null || loading
                 ? [Colors.muted, Colors.muted]
                 : [Colors.primary, Colors.secondary]
             }
@@ -228,7 +278,7 @@ const Upgrade = () => {
                 fontWeight="600"
                 color={Colors.inputBackground}
               >
-                Purchase Upgrade
+                {loading ? 'Processing...' : 'Purchase Upgrade'}
               </Text>
             </HStack>
           </LinearGradient>

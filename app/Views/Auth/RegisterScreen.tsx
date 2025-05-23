@@ -1,18 +1,74 @@
 import React, { useState } from 'react';
-import { StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { Box, Text, VStack, HStack, Pressable } from 'native-base';
 import { MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import Colors from '../../Colors/Color';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from './Index';
+import { authService } from '../../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Toast from 'react-native-toast-message';
 
 type RegisterScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'RegisterScreen'>;
 
 const RegisterScreen: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigation = useNavigation<RegisterScreenNavigationProp>();
+
+  const handleRegister = async () => {
+    if (!username || !email || !password || !confirmPassword) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please fill in all fields',
+        position: 'top',
+      });
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Passwords do not match',
+        position: 'top',
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const response = await authService.register(username, email, password);
+      if (response.token) {
+        // Store the token using AsyncStorage
+        await AsyncStorage.setItem('token', response.token);
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Registration successful!',
+          position: 'top',
+        });
+        // Navigate to Coins screen
+        navigation.navigate('Login');
+      }
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.response?.data?.message || 'Registration failed. Please try again.',
+        position: 'top',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <Box flex={1} bg={Colors.background} safeArea>
@@ -38,6 +94,8 @@ const RegisterScreen: React.FC = () => {
                 placeholderTextColor={Colors.placeholder}
                 style={styles.input}
                 autoCapitalize="words"
+                value={username}
+                onChangeText={setUsername}
               />
             </HStack>
           </Box>
@@ -52,6 +110,8 @@ const RegisterScreen: React.FC = () => {
                 style={styles.input}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                value={email}
+                onChangeText={setEmail}
               />
             </HStack>
           </Box>
@@ -65,6 +125,8 @@ const RegisterScreen: React.FC = () => {
                 placeholderTextColor={Colors.placeholder}
                 style={styles.input}
                 secureTextEntry={!showPassword}
+                value={password}
+                onChangeText={setPassword}
               />
               <Pressable onPress={() => setShowPassword(!showPassword)}>
                 <Ionicons
@@ -85,6 +147,8 @@ const RegisterScreen: React.FC = () => {
                 placeholderTextColor={Colors.placeholder}
                 style={styles.input}
                 secureTextEntry={!showConfirmPassword}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
               />
               <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
                 <Ionicons
@@ -99,10 +163,11 @@ const RegisterScreen: React.FC = () => {
           {/* Register Button */}
           <TouchableOpacity
             style={[styles.button, { backgroundColor: Colors.primary }]}
-            onPress={() => {}}
+            onPress={handleRegister}
+            disabled={isLoading}
           >
             <Text color={Colors.buttonText} fontSize="md" fontWeight="bold">
-              Create Account
+              {isLoading ? 'Creating Account...' : 'Create Account'}
             </Text>
           </TouchableOpacity>
 

@@ -1,5 +1,5 @@
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect } from "react";
+import { useEffect } from "react";
 import { StyleSheet, Text, View, SafeAreaView, I18nManager, Platform } from "react-native";
 import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { useFonts } from "expo-font";
@@ -12,7 +12,12 @@ import AuthPages from "./app/Views/Auth/Index";
 import store from "./store/store";
 import Colors from "./app/Colors/Color";
 import MainScreens from "./app/Index";
+import { BackHandler } from 'react-native';
 
+
+if (typeof (BackHandler as any).removeEventListener === 'undefined') {
+  (BackHandler as any).removeEventListener = () => {};
+}
 const MyTheme = {
   ...DefaultTheme,
   colors: {
@@ -21,8 +26,11 @@ const MyTheme = {
   },
 };
 
+// Prevent splash screen from auto-hiding
+SplashScreen.preventAutoHideAsync();
+
 export default function App() {
-  SplashScreen.preventAutoHideAsync();
+
   useEffect(() => {
     if (I18nManager.isRTL) {
       I18nManager.forceRTL(false);
@@ -94,8 +102,8 @@ export default function App() {
   if (!fontsLoaded) return null;
 
   return (
-        <GestureHandlerRootView style={{ flex: 1 }}> {/* Moved to root */}
-      <Provider store={store}>
+    <Provider store={store}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <NativeBaseProvider theme={theme}>
             <NavigationContainer theme={MyTheme}>
@@ -104,8 +112,8 @@ export default function App() {
             </NavigationContainer>
           </NativeBaseProvider>
         </SafeAreaProvider>
-      </Provider>
-    </GestureHandlerRootView>
+      </GestureHandlerRootView>
+    </Provider>
   );
 }
 

@@ -8,13 +8,16 @@ import {
   ScrollView,
   Pressable,
   useToast,
+  Input,
+  Button,
 } from 'native-base';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../../../store/store';
 import { updateMinedAmount, increaseMiningSpeed } from '../../../../store/coinSlice';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Animated, Easing, Clipboard } from 'react-native';
+import { Animated, Easing, Platform, TextInput } from 'react-native';
 import Colors from '../../../Colors/Color';
+import { referralService } from '../../../../app/services/api';
 
 const Home = () => {
   const dispatch = useDispatch();
@@ -30,7 +33,9 @@ const Home = () => {
   const miningIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const toast = useToast();
   const [isCopied, setIsCopied] = useState(false);
-  const referralCode = 'REF123456'; // Static for demo; replace with dynamic value from store/API
+  const [referralCode, setReferralCode] = useState('');
+  const [inputReferralCode, setInputReferralCode] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const getCoinImage = () => {
     switch (selectedCoin) {
@@ -120,6 +125,59 @@ const Home = () => {
     };
   }, [isMining, minedAmount]);
 
+  useEffect(() => {
+    fetchReferralCode();
+  }, []);
+
+  const fetchReferralCode = async () => {
+    try {
+      const response = await referralService.generateCode();
+      setReferralCode(response.code);
+    } catch (error) {
+      console.error('Error fetching referral code:', error);
+      toast.show({
+        title: "Error",
+        description: "Failed to fetch referral code",
+        variant: "solid",
+        bg: "error.500"
+      });
+    }
+  };
+
+  const handleAcceptReferral = async () => {
+    if (!inputReferralCode) {
+      toast.show({
+        title: "Error",
+        description: "Please enter a referral code",
+        variant: "solid",
+        bg: "error.500"
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await referralService.acceptReferral(inputReferralCode);
+      toast.show({
+        title: "Success",
+        description: response.message,
+        variant: "solid",
+        bg: "success.500"
+      });
+      setInputReferralCode('');
+    } catch (error) {
+      console.error('Error accepting referral:', error);
+      toast.show({
+        title: "Error",
+        description: "Failed to accept referral code",
+        variant: "solid",
+        bg: "error.500"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const spin = rotation.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
@@ -149,17 +207,6 @@ const Home = () => {
 
   const handleWatchAd = () => {
     dispatch(increaseMiningSpeed(3));
-  };
-
-  const handleCopyReferral = () => {
-    Clipboard.setString(referralCode);
-    setIsCopied(true);
-    toast.show({
-      description: 'Referral code copied!',
-      duration: 2000,
-      placement: 'top',
-    });
-    setTimeout(() => setIsCopied(false), 2000);
   };
 
   return (
@@ -265,106 +312,6 @@ const Home = () => {
           borderWidth={1}
           borderColor={Colors.border}
         >
-          <Text color={Colors.text} fontSize="lg" fontWeight="600" mb={3}>
-            Boost Mining Speed
-          </Text>
-          <Text color={Colors.textSecondary} fontSize="sm" mb={4}>
-            Watch an ad to increase your mining speed by 3 GH/s!
-          </Text>
-          <Pressable
-            onPress={handleWatchAd}
-            bg={Colors.primary}
-            borderRadius={8}
-            p={3}
-            alignItems="center"
-            _pressed={{ bg: Colors.secondary }}
-          >
-            <Text color={Colors.buttonText} fontSize="md" fontWeight="600">
-              Watch Ad
-            </Text>
-          </Pressable>
-        </Box>
-
-        <HStack justifyContent="space-between" w="100%" flexWrap="wrap">
-          <Box
-            bg={Colors.surface}
-            p={4}
-            borderRadius={12}
-            w="48%"
-            mb={3}
-            shadow={2}
-            borderWidth={1}
-            borderColor={Colors.border}
-          >
-            <Text color={Colors.textSecondary} fontSize="sm" fontWeight="500">
-              Mining Speed
-            </Text>
-            <Text color={Colors.primary} fontSize="lg" fontWeight="700">
-              {miningSpeed} GH/s
-            </Text>
-          </Box>
-          <Box
-            bg={Colors.surface}
-            p={4}
-            borderRadius={12}
-            w="48%"
-            mb={3}
-            shadow={2}
-            borderWidth={1}
-            borderColor={Colors.border}
-          >
-            <Text color={Colors.textSecondary} fontSize="sm" fontWeight="500">
-              Mined Amount
-            </Text>
-            <Text color={Colors.primary} fontSize="lg" fontWeight="700">
-              {displayedMinedAmount.toFixed(12)} {selectedCoin}
-            </Text>
-          </Box>
-          <Box
-            bg={Colors.surface}
-            p={4}
-            borderRadius={12}
-            w="48%"
-            mb={3}
-            shadow={2}
-            borderWidth={1}
-            borderColor={Colors.border}
-          >
-            <Text color={Colors.textSecondary} fontSize="sm" fontWeight="500">
-              Uptime
-            </Text>
-            <Text color={Colors.primary} fontSize="lg" fontWeight="700">
-              {formatUptime(uptime)}
-            </Text>
-          </Box>
-          <Box
-            bg={Colors.surface}
-            p={4}
-            borderRadius={12}
-            w="48%"
-            mb={3}
-            shadow={2}
-            borderWidth={1}
-            borderColor={Colors.border}
-          >
-            <Text color={Colors.textSecondary} fontSize="sm" fontWeight="500">
-              Network Difficulty
-            </Text>
-            <Text color={Colors.primary} fontSize="lg" fontWeight="700">
-              88.1 T
-            </Text>
-          </Box>
-        </HStack>
-
-        <Box
-          bg={Colors.surface}
-          p={5}
-          borderRadius={12}
-          w="100%"
-          shadow={2}
-          borderWidth={1}
-          borderColor={Colors.border}
-        >
           <Text color={Colors.text} fontSize="lg" fontWeight="600">
             Wallet Balance
           </Text>
@@ -401,16 +348,22 @@ const Home = () => {
               {referralCode}
             </Text>
             <Pressable
-              onPress={handleCopyReferral}
-              bg={isCopied ? Colors.success : Colors.primary}
-              borderRadius={6}
-              p={2}
-              px={4}
-              _pressed={{ bg: Colors.secondary }}
+              onPress={() => {
+                setIsCopied(true);
+                toast.show({
+                  description: 'Referral code copied!',
+                  duration: 2000,
+                  placement: 'top',
+                });
+                setTimeout(() => setIsCopied(false), 2000);
+              }}
+              _pressed={{ opacity: 0.7 }}
             >
-              <Text color={Colors.buttonText} fontSize="sm" fontWeight="600">
-                {isCopied ? 'Copied!' : 'Copy'}
-              </Text>
+              <Box p={2} bg={Colors.primary} rounded="md">
+                <Text color={Colors.buttonText}>
+                  {isCopied ? 'Copied!' : 'Copy'}
+                </Text>
+              </Box>
             </Pressable>
           </HStack>
         </Box>
@@ -445,6 +398,68 @@ const Home = () => {
             ))}
           </VStack>
         </Box>
+
+        <VStack space={4} width="100%" bg={Colors.surface} p={4} rounded="lg" shadow={2}>
+          <Text fontSize="xl" fontWeight="bold" color={Colors.text}>
+            Referral Program
+          </Text>
+
+          <VStack space={2}>
+            <Text color={Colors.text}>Your Referral Code:</Text>
+            <HStack space={2} alignItems="center">
+              <Text fontSize="lg" fontWeight="bold" color={Colors.primary}>
+                {referralCode || 'Loading...'}
+              </Text>
+              <Pressable
+                onPress={() => {
+                  setIsCopied(true);
+                  toast.show({
+                    description: 'Referral code copied!',
+                    duration: 2000,
+                    placement: 'top',
+                  });
+                  setTimeout(() => setIsCopied(false), 2000);
+                }}
+                _pressed={{ opacity: 0.7 }}
+              >
+                <Box p={2} bg={Colors.primary} rounded="md">
+                  <Text color={Colors.buttonText}>
+                    {isCopied ? 'Copied!' : 'Copy'}
+                  </Text>
+                </Box>
+              </Pressable>
+            </HStack>
+          </VStack>
+
+          <VStack space={2}>
+            <Text color={Colors.text}>Enter Referral Code:</Text>
+            <TextInput
+              placeholder="Enter code"
+              value={inputReferralCode}
+              onChangeText={setInputReferralCode}
+              autoCapitalize="characters"
+              style={{
+                backgroundColor: Colors.inputBackground,
+                color: Colors.text,
+                padding: 12,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: Colors.border,
+                fontSize: 16,
+              }}
+              placeholderTextColor={Colors.textSecondary}
+            />
+            <Button
+              onPress={handleAcceptReferral}
+              isLoading={loading}
+              isLoadingText="Processing..."
+              bg={Colors.primary}
+              _pressed={{ bg: Colors.secondary }}
+            >
+              Accept Referral
+            </Button>
+          </VStack>
+        </VStack>
       </VStack>
     </ScrollView>
   );

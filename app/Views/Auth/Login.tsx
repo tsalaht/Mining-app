@@ -8,13 +8,46 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from './Index';
 import { setPassHome } from '../../../store/PassHomeSlice';
 import { useSelector, useDispatch } from 'react-redux';
+import { authService } from '../../services/api';
+import { useCustomToast } from '../../utils/toast';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
 const Login: React.FC = () => {
   const dispatch = useDispatch();
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigation = useNavigation<LoginScreenNavigationProp>();
+  const { showSuccess, showError } = useCustomToast();
+
+  const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      showError('Please fill in all fields');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      const response = await authService.login(email, password);
+
+      if (response?.token) {
+        await AsyncStorage.setItem('token', response.token);
+        showSuccess('Login successful!');
+    navigation.navigate('Coins')
+      } else {
+        showError('Login failed. No token received.');
+      }
+    } catch (error: any) {
+      const errorMsg = error?.response?.data?.message || error?.message || 'Login failed. Please try again.';
+      showError(errorMsg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <Box flex={1} bg={Colors.background} safeArea>
@@ -41,7 +74,8 @@ const Login: React.FC = () => {
                 style={styles.input}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                
+                value={email}
+                onChangeText={setEmail}
               />
             </HStack>
           </Box>
@@ -55,6 +89,8 @@ const Login: React.FC = () => {
                 placeholderTextColor={Colors.placeholder}
                 style={styles.input}
                 secureTextEntry={!showPassword}
+                value={password}
+                onChangeText={setPassword}
               />
               <Pressable onPress={() => setShowPassword(!showPassword)}>
                 <Ionicons
@@ -76,11 +112,11 @@ const Login: React.FC = () => {
           {/* Login Button */}
           <TouchableOpacity
             style={[styles.button, { backgroundColor: Colors.primary }]}
-            // onPress={() => {dispatch(setPassHome(true))}}
-            onPress={() => navigation.navigate('Coins')}
+            onPress={handleLogin}
+            disabled={isLoading}
           >
             <Text color={Colors.buttonText} fontSize="md" fontWeight="bold">
-              Sign In
+              {isLoading ? 'Signing In...' : 'Sign In'}
             </Text>
           </TouchableOpacity>
 

@@ -16,6 +16,8 @@ import { Animated, Easing } from 'react-native';
 import Wallet from "./Wallet/Wallet";
 import Upgrade from "./Upgrade/Upgrade";
 import Profile from "./Profile/Index";
+import { miningService } from '../../../app/services/api';
+import { useToast } from 'native-base';
 
 type TabParamList = {
   Home: undefined;
@@ -38,7 +40,9 @@ const MiningAppTabs: React.FC = () => {
   const [focusedTab, setFocusedTab] = useState<string>("");
   const dispatch = useDispatch();
   const { isMining } = useSelector((state: RootState) => state.mining);
+  const { selectedCoin } = useSelector((state: RootState) => state.coin);
   const [buttonScale] = useState(new Animated.Value(1));
+  const toast = useToast();
 
   const handleTabPress = (name: string) => {
     if (focusedTab !== name) {
@@ -46,23 +50,71 @@ const MiningAppTabs: React.FC = () => {
     }
   };
 
-  const handleMiningToggle = () => {
-    Animated.sequence([
-      Animated.timing(buttonScale, {
-        toValue: 0.9,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(buttonScale, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-    if (isMining) {
-      dispatch(stopMining());
-    } else {
-      dispatch(startMining());
+  const handleMiningToggle = async () => {
+    try {
+      // Check if a coin is selected before starting mining
+      if (!isMining && !selectedCoin) {
+        toast.show({
+          title: "Error",
+          description: "Please select a coin before starting mining",
+          variant: "solid",
+          bg: "error.500"
+        });
+        return;
+      }
+
+      Animated.sequence([
+        Animated.timing(buttonScale, {
+          toValue: 0.9,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(buttonScale, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      if (isMining) {
+        const stopResponse = await miningService.stopMining();
+        dispatch(stopMining());
+        toast.show({
+          title: "Success",
+          description: stopResponse.message || "Mining stopped successfully",
+          variant: "solid",
+          bg: "success.500"
+        });
+      } else {
+        const startResponse = await miningService.startMining(selectedCoin);
+        dispatch(startMining());
+        toast.show({
+          title: "Success",
+          description: startResponse.message || "Mining started successfully",
+          variant: "solid",
+          bg: "success.500"
+        });
+      }
+    } catch (error: any) {
+      console.error('Mining toggle error:', error);
+      
+      // Handle specific error cases
+      let errorMessage = "An error occurred";
+      
+      if (error.message === 'Invalid coin symbol. Please select a valid coin.') {
+        errorMessage = error.message;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast.show({
+        title: "Error",
+        description: errorMessage,
+        variant: "solid",
+        bg: "error.500"
+      });
     }
   };
 

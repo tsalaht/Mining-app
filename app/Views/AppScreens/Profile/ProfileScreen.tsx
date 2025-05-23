@@ -7,23 +7,98 @@ import {
   Icon,
   ScrollView,
   Pressable,
+  Spinner,
+  Button,
 } from 'native-base';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Animated, Easing } from 'react-native';
 import Colors from '../../../Colors/Color';
 import { useNavigation } from '@react-navigation/native';
+import { userService, walletService } from '../../../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Static user data
-const staticUser = {
-  name: 'John Doe',
-  email: 'john.doe@example.com',
-  membershipStatus: 'Premium',
-};
+interface UserProfile {
+  username: string;
+  email: string;
+  level: number;
+  mining_rate: number;
+  coins: Array<{
+    symbol: string;
+    balance: string;
+  }>;
+}
 
 const ProfileScreen = () => {
   const [glow] = useState(new Animated.Value(0));
   const navigation: any = useNavigation();
+  const [loading, setLoading] = useState(true);
+  const [userData, setUserData] = useState<UserProfile | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  useEffect(() => {
+    fetchUserData();
+  }, [retryCount]);
+
+  const fetchUserData = async () => {
+    try {
+      console.log('Starting to fetch user data...');
+      setLoading(true);
+      setError(null);
+
+      // Check if we have a token
+      const token = await AsyncStorage.getItem('token');
+      console.log('Current token status:', !!token);
+
+      if (!token) {
+        console.log('No token found, redirecting to login');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+        return;
+      }
+
+      console.log('Fetching profile data...');
+      const profileData = await userService.getProfile();
+
+
+ 
+      const walletData = await walletService.getWallet();
+ 
+
+      setUserData({
+        ...profileData,
+        coins: walletData.coins || [],
+      });
+ 
+    } catch (err) {
+      
+      setError('Failed to load profile data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRetry = () => {
+  
+    setRetryCount(prev => prev + 1);
+  };
+
+  const handleLogout = async () => {
+    try {
+      console.log('Logging out...');
+      await AsyncStorage.removeItem('token');
+      console.log('Token removed');
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+  };
 
   useEffect(() => {
     // Glow animation for profile card
@@ -67,10 +142,34 @@ const ProfileScreen = () => {
     {
       id: 3,
       type: 'Membership',
-      status: staticUser.membershipStatus,
+      status: userData?.level === 10 ? 'Premium' : 'Standard',
       description: 'Current plan status.',
     },
   ];
+
+  if (loading) {
+    return (
+      <Box flex={1} bg={Colors.background} justifyContent="center" alignItems="center">
+        <Spinner size="lg" color={Colors.primary} />
+        <Text mt={4} color={Colors.text}>Loading profile data...</Text>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box flex={1} bg={Colors.background} justifyContent="center" alignItems="center" p={4}>
+        <Text color={Colors.danger} fontSize="lg" mb={4}>{error}</Text>
+        <Button
+          onPress={handleRetry}
+          bg={Colors.primary}
+          _pressed={{ opacity: 0.7 }}
+        >
+          <Text color={Colors.buttonText}>Retry</Text>
+        </Button>
+      </Box>
+    );
+  }
 
   return (
     <ScrollView flex={1} bg={Colors.background}>
@@ -123,7 +222,7 @@ const ProfileScreen = () => {
                 color={Colors.buttonText}
               />
               <Text fontSize="xl" fontWeight="600" color={Colors.buttonText}>
-                {staticUser.name}
+                {userData?.username}
               </Text>
             </HStack>
             <Text
@@ -132,13 +231,32 @@ const ProfileScreen = () => {
               color={Colors.buttonText}
               mt={2}
             >
-              {staticUser.email}
+              {userData?.email}
             </Text>
             <Text fontSize="sm" color={Colors.inputBackground} mt={1}>
-              Member since {new Date().getFullYear()}
+              Level {userData?.level} • Mining Rate: {userData?.mining_rate}
             </Text>
           </LinearGradient>
         </Animated.View>
+
+        {/* Wallet Section */}
+        <Box w="100%" bg={Colors.surface} p={4} borderRadius={16} borderWidth={1} borderColor={Colors.border}>
+          <Text fontSize="lg" fontWeight="600" color={Colors.text} mb={4}>
+            Your Wallet
+          </Text>
+          <VStack space={3}>
+            {userData?.coins.map((coin, index) => (
+              <HStack key={index} justifyContent="space-between" alignItems="center">
+                <Text fontSize="md" color={Colors.text}>
+                  {coin.symbol}
+                </Text>
+                <Text fontSize="md" fontWeight="600" color={Colors.text}>
+                  {coin.balance}
+                </Text>
+              </HStack>
+            ))}
+          </VStack>
+        </Box>
 
         {/* Action Buttons */}
         <HStack space={2} w="100%" justifyContent="center" flexWrap="wrap">
@@ -221,7 +339,7 @@ const ProfileScreen = () => {
             </Box>
           </Pressable>
           <Pressable
-            onPress={() => console.log('Log Out pressed')}
+            onPress={handleLogout}
             _pressed={{ opacity: 0.7 }}
             flexBasis="48%"
             mb={2}
