@@ -1,6 +1,5 @@
-import { Stack, View, Pressable } from "native-base";
-import React, { useState } from "react";
-import { Text } from "native-base";
+import { Stack, View, Pressable, Text } from "native-base";
+import React, { useState, useEffect } from "react";
 import {
   BottomTabNavigationOptions,
   createBottomTabNavigator,
@@ -12,8 +11,8 @@ import { startMining, stopMining } from '../../../store/miningSlice';
 import Colors from "../../Colors/Color";
 import Home from "./Home/Index";
 import { LinearGradient } from 'expo-linear-gradient';
-import { Animated, Easing } from 'react-native';
-import Wallet from "./Wallet/Wallet";
+import { Animated, Easing, ActivityIndicator } from 'react-native';
+import MyWallet from "./Wallet/Index";
 import Upgrade from "./Upgrade/Upgrade";
 import Profile from "./Profile/Index";
 import { miningService } from '../../../app/services/api';
@@ -34,15 +33,75 @@ interface Screen {
   options?: BottomTabNavigationOptions;
 }
 
+interface MiningStatus {
+  isActive: boolean;
+  startTime?: string;
+  remainingTime?: number;
+  currentRate?: number;
+}
+
 const Tab = createBottomTabNavigator<TabParamList>();
 
 const MiningAppTabs: React.FC = () => {
   const [focusedTab, setFocusedTab] = useState<string>("");
   const dispatch = useDispatch();
+  const toast = useToast();
   const { isMining } = useSelector((state: RootState) => state.mining);
   const { selectedCoin } = useSelector((state: RootState) => state.coin);
   const [buttonScale] = useState(new Animated.Value(1));
-  const toast = useToast();
+  const [miningStatus, setMiningStatus] = useState<MiningStatus | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Fetch initial mining status
+    fetchMiningStatus();
+
+    // Poll mining status every 30 seconds while active
+    let interval: NodeJS.Timeout | null = null;
+    if (isMining) {
+      interval = setInterval(fetchMiningStatus, 30000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isMining]);
+
+  const fetchMiningStatus = async () => {
+    try {
+      setLoading(true);
+      const response = await miningService.getMiningStatus();
+      console.log('Mining status response:', response);
+      const status: MiningStatus = {
+        isActive: response.isActive || false,
+        startTime: response.startTime,
+        remainingTime: response.remainingTime,
+        currentRate: response.currentRate,
+      };
+      setMiningStatus(status);
+
+      // Sync Redux state with backend
+      if (status.isActive && !isMining) {
+        dispatch(startMining());
+      } else if (!status.isActive && isMining) {
+        dispatch(stopMining());
+      }
+    } catch (error: any) {
+      console.error('Error fetching mining status:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      toast.show({
+        title: "Error",
+        description: "Failed to fetch mining status. Please try again.",
+        variant: "solid",
+        bg: "error.500",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleTabPress = (name: string) => {
     if (focusedTab !== name) {
@@ -51,18 +110,35 @@ const MiningAppTabs: React.FC = () => {
   };
 
   const handleMiningToggle = async () => {
+    if (loading) return; // Prevent multiple clicks during loading
+
     try {
-      // Check if a coin is selected before starting mining
-      if (!isMining && !selectedCoin) {
+      setLoading(true);
+
+      // Check if a coin is selected
+      if (!selectedCoin) {
         toast.show({
           title: "Error",
           description: "Please select a coin before starting mining",
           variant: "solid",
-          bg: "error.500"
+          bg: "error.500",
         });
         return;
       }
 
+      // Validate selectedCoin
+      const validCoins = ['BTS', 'JHS']; // Update based on backend-supported coins
+      if (!validCoins.includes(selectedCoin)) {
+        toast.show({
+          title: "Error",
+          description: `Invalid coin: ${selectedCoin}. Please select BTS or JHS.`,
+          variant: "solid",
+          bg: "error.500",
+        });
+        return;
+      }
+
+      // Animate button press
       Animated.sequence([
         Animated.timing(buttonScale, {
           toValue: 0.9,
@@ -76,31 +152,50 @@ const MiningAppTabs: React.FC = () => {
         }),
       ]).start();
 
-      if (isMining) {
+      // Fetch latest status before toggling
+      const status = await miningService.getMiningStatus();
+      console.log('Pre-toggle mining status:', status);
+      const isActive = status.isActive || false;
+
+      if (isActive) {
+        // Stop mining
         const stopResponse = await miningService.stopMining();
+        console.log('Stop mining response:', stopResponse);
         dispatch(stopMining());
+        setMiningStatus({ isActive: false });
         toast.show({
           title: "Success",
           description: stopResponse.message || "Mining stopped successfully",
           variant: "solid",
-          bg: "success.500"
+          bg: "success.500",
         });
       } else {
+        // Start mining
+        console.log('Starting mining for coin:', selectedCoin);
         const startResponse = await miningService.startMining(selectedCoin);
+        console.log('Start mining response:', startResponse);
         dispatch(startMining());
+        setMiningStatus({
+          isActive: true,
+          startTime: new Date().toISOString(),
+          remainingTime: startResponse.remainingTime || 18000000, // Default to 5 hours
+          currentRate: startResponse.currentRate || 1.0,
+        });
         toast.show({
           title: "Success",
           description: startResponse.message || "Mining started successfully",
           variant: "solid",
-          bg: "success.500"
+          bg: "success.500",
         });
       }
     } catch (error: any) {
-      console.error('Mining toggle error:', error);
-      
-      // Handle specific error cases
+      console.error('Mining toggle error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+
       let errorMessage = "An error occurred";
-      
       if (error.message === 'Invalid coin symbol. Please select a valid coin.') {
         errorMessage = error.message;
       } else if (error.response?.data?.message) {
@@ -113,8 +208,10 @@ const MiningAppTabs: React.FC = () => {
         title: "Error",
         description: errorMessage,
         variant: "solid",
-        bg: "error.500"
+        bg: "error.500",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -137,14 +234,6 @@ const MiningAppTabs: React.FC = () => {
     zIndex: 1,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-  };
-
-  const tabBarItemStyle = {
-    paddingVertical: 10,
-    marginBottom: 8,
-    flex: 1,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
   };
 
   const screens: Screen[] = [
@@ -179,7 +268,7 @@ const MiningAppTabs: React.FC = () => {
     },
     {
       name: "Wallet",
-      component: Wallet,
+      component: MyWallet,
       icon: ({ focused, color, size }) => (
         <View
           style={{
@@ -273,8 +362,8 @@ const MiningAppTabs: React.FC = () => {
         tabBarStyle: commonTabBarStyle,
         tabBarLabel: () => null,
         headerShown: false,
-        tabBarIconStyle: { position: "relative" },
-        animation: 'none',
+        tabBarIconStyle: { position: "center" },
+        animationDuration: 0,
       }}
     >
       {screens.slice(0, 2).map((screen, index) => (
@@ -284,7 +373,7 @@ const MiningAppTabs: React.FC = () => {
           component={screen.component}
           options={{
             ...screen.options,
-            tabBarIcon: ({ focused, color, size }: { focused: boolean; color: string; size: number }) =>
+            tabBarIcon: ({ focused, color, size }) =>
               screen.icon({ focused, color, size }),
           }}
           listeners={{
@@ -300,48 +389,53 @@ const MiningAppTabs: React.FC = () => {
             <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
               <Pressable
                 onPress={handleMiningToggle}
+                isDisabled={loading}
                 style={{
-                  position: "absolute",
+                  position: 'absolute',
                   top: -35,
-                  alignSelf: "center",
+                  alignSelf: 'center',
                   width: 70,
                   height: 70,
                   borderRadius: 35,
-                  justifyContent: "center",
-                  alignItems: "center",
+                  justifyContent: 'center',
+                  alignItems: 'center',
                   elevation: 12,
                   shadowOpacity: 0.25,
                   shadowColor: Colors.border,
                   shadowOffset: { width: 0, height: 4 },
                   shadowRadius: 8,
                   borderWidth: 2,
-                  borderColor: Colors.surface,
+                  borderColor: Colors.border,
                   zIndex: 1000,
                 }}
               >
                 <LinearGradient
                   colors={isMining ? [Colors.danger, '#B91C1C'] : [Colors.primary, Colors.secondary]}
                   style={{
-                    position: 'absolute',
+                    position: "absolute",
                     top: 0,
                     left: 0,
                     right: 0,
                     bottom: 0,
                     borderRadius: 35,
-                    justifyContent: 'center',
-                    alignItems: 'center',
+                    justifyContent: "center",
+                    alignItems: "center",
                   }}
                 >
-                  <AntDesign
-                    name={isMining ? "pausecircle" : "rocket1"}
-                    size={32}
-                    color={Colors.buttonText}
-                  />
+                  {loading ? (
+                    <ActivityIndicator size="small" color={Colors.buttonText} />
+                  ) : (
+                    <AntDesign
+                      name={isMining ? 'pausecircle' : 'rocket1'}
+                      size={32}
+                      color={Colors.buttonText}
+                    />
+                  )}
                 </LinearGradient>
               </Pressable>
             </Animated.View>
           ),
-          tabBarStyle: { display: "none" },
+          tabBarStyle: { display: 'none' },
         }}
       />
       {screens.slice(2).map((screen, index) => (
@@ -351,7 +445,7 @@ const MiningAppTabs: React.FC = () => {
           component={screen.component}
           options={{
             ...screen.options,
-            tabBarIcon: ({ focused, color, size }: { focused: boolean; color: string; size: number }) =>
+            tabBarIcon: ({ focused, color, size }) =>
               screen.icon({ focused, color, size }),
           }}
           listeners={{

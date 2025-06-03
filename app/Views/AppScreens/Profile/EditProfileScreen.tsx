@@ -8,8 +8,10 @@ import {
   ScrollView,
   Spinner,
   AlertDialog,
+  HStack,
+  Button,
 } from 'native-base';
-import { TextInput, StyleSheet } from 'react-native';
+import { TextInput, StyleSheet, Alert } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../../../store/store';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -103,20 +105,35 @@ const EditProfileScreen = () => {
   };
 
   const handleDeleteAccount = async () => {
-    try {
-      setLoading(true);
-      await userService.deleteAccount();
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Login' }],
-      });
-    } catch (err) {
-      console.error('Error deleting account:', err);
-      alert('Failed to delete account. Please try again.');
-    } finally {
-      setLoading(false);
-      setShowDeleteDialog(false);
-    }
+    Alert.alert(
+      "Delete Account",
+      "Are you sure you want to delete your account?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await userService.deleteAccount();
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Login' }],
+              });
+            } catch (err) {
+              console.error('Error deleting account:', err);
+              alert('Failed to delete account. Please try again.');
+            } finally {
+              setLoading(false);
+            }
+          },
+          style: "destructive"
+        }
+      ]
+    );
   };
 
   if (loading) {
@@ -151,7 +168,7 @@ const EditProfileScreen = () => {
         </LinearGradient>
 
         {/* Profile Image */}
-        <Pressable onPress={pickImage} _pressed={{ opacity: 0.7 }}>
+        {/* <Pressable onPress={pickImage} _pressed={{ opacity: 0.7 }}>
           <Box position="relative">
             <Box
               bg={Colors.primary}
@@ -165,7 +182,7 @@ const EditProfileScreen = () => {
               />
             </Box>
           </Box>
-        </Pressable>
+        </Pressable> */}
 
         {/* Input Fields */}
         <VStack space={4} w="100%">
@@ -232,56 +249,17 @@ const EditProfileScreen = () => {
         </Pressable>
 
         {/* Delete Account Button */}
-        <Pressable
-          onPress={() => setShowDeleteDialog(true)}
-          _pressed={{ opacity: 0.7 }}
+        <Button
+          onPress={handleDeleteAccount}
+          bg={Colors.danger}
           w="100%"
+          py={4}
+          borderRadius={12}
         >
-          <Box
-            bg={Colors.danger}
-            borderRadius={12}
-            padding={16}
-            alignItems="center"
-          >
-            <Text
-              fontSize="lg"
-              fontWeight="600"
-              color={Colors.buttonText}
-            >
-              Delete Account
-            </Text>
-          </Box>
-        </Pressable>
-
-        {/* Delete Account Confirmation Dialog */}
-        <AlertDialog
-          leastDestructiveRef={cancelRef}
-          isOpen={showDeleteDialog}
-          onClose={() => setShowDeleteDialog(false)}
-        >
-          <AlertDialog.Content>
-            <AlertDialog.Header>Delete Account</AlertDialog.Header>
-            <AlertDialog.Body>
-              Are you sure you want to delete your account? This action cannot be undone.
-            </AlertDialog.Body>
-            <AlertDialog.Footer>
-              <Pressable
-                ref={cancelRef}
-                onPress={() => setShowDeleteDialog(false)}
-                _pressed={{ opacity: 0.7 }}
-                mr={3}
-              >
-                <Text color={Colors.text}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                onPress={handleDeleteAccount}
-                _pressed={{ opacity: 0.7 }}
-              >
-                <Text color={Colors.danger}>Delete</Text>
-              </Pressable>
-            </AlertDialog.Footer>
-          </AlertDialog.Content>
-        </AlertDialog>
+          <Text color={Colors.buttonText} fontSize="md">
+            Delete Account
+          </Text>
+        </Button>
       </VStack>
     </ScrollView>
   );

@@ -15,7 +15,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../../../store/store';
 import { updateMinedAmount, increaseMiningSpeed } from '../../../../store/coinSlice';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Animated, Easing, Platform, TextInput } from 'react-native';
+import { Animated, Easing, Platform, TextInput, KeyboardAvoidingView } from 'react-native';
 import Colors from '../../../Colors/Color';
 import { referralService } from '../../../../app/services/api';
 
@@ -210,205 +210,151 @@ const Home = () => {
   };
 
   return (
-    <ScrollView flex={1} bg={Colors.background}>
-      <VStack space={6} alignItems="center" px={4} pt={8} pb={32}>
-        <Text
-          fontSize="2xl"
-          fontWeight="700"
-          color={Colors.text}
-          textAlign="center"
-        >
-          Mining Dashboard
-        </Text>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+    >
+      <ScrollView 
+        flex={1} 
+        bg={Colors.background}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: 100 }}
+      >
+        <VStack space={6} alignItems="center" px={4} pt={8} pb={32}>
+          <Text
+            fontSize="2xl"
+            fontWeight="700"
+            color={Colors.text}
+            textAlign="center"
+          >
+            Mining Dashboard
+          </Text>
 
-        <Box
-          borderRadius={16}
-          p={6}
-          alignItems="center"
-        >
-          {isMining && (
-            <Animated.View
+          <Box
+            borderRadius={16}
+            p={6}
+            alignItems="center"
+          >
+            {isMining && (
+              <Animated.View
+                style={{
+                  position: 'absolute',
+                  width: 180,
+                  height: 180,
+                  borderRadius: 90,
+                  opacity: pulseOpacity,
+                  transform: [{ scale: pulseScale }],
+                }}
+              >
+                <LinearGradient
+                  colors={[Colors.accent, 'transparent']}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: 90,
+                  }}
+                />
+              </Animated.View>
+            )}
+            <LinearGradient
+              colors={[Colors.primary, Colors.secondary, Colors.accent, Colors.primary]}
               style={{
                 position: 'absolute',
-                width: 180,
-                height: 180,
-                borderRadius: 90,
-                opacity: pulseOpacity,
-                transform: [{ scale: pulseScale }],
+                width: 200,
+                height: 200,
+                borderRadius: 100,
+                opacity: isMining ? 1 : 0,
+                justifyContent: 'center',
+                alignItems: 'center',
               }}
             >
-              <LinearGradient
-                colors={[Colors.accent, 'transparent']}
+              <Animated.View
                 style={{
-                  width: '100%',
-                  height: '100%',
-                  borderRadius: 90,
+                  width: 185,
+                  height: 185,
+                  borderRadius: 92.5,
+                  backgroundColor: Colors.surface,
+                  transform: [{ rotate: spin }],
+                  borderWidth: 3,
+                  borderColor: 'transparent',
+                  shadowColor: Colors.accent,
+                  shadowOpacity: glowOpacity,
+                  shadowRadius: 10,
+                  shadowOffset: { width: 0, height: 0 },
                 }}
               />
-            </Animated.View>
-          )}
-          <LinearGradient
-            colors={[Colors.primary, Colors.secondary, Colors.accent, Colors.primary]}
-            style={{
-              position: 'absolute',
-              width: 200,
-              height: 200,
-              borderRadius: 100,
-              opacity: isMining ? 1 : 0,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
+            </LinearGradient>
             <Animated.View
               style={{
-                width: 185,
-                height: 185,
-                borderRadius: 92.5,
-                backgroundColor: Colors.surface,
-                transform: [{ rotate: spin }],
-                borderWidth: 3,
-                borderColor: 'transparent',
                 shadowColor: Colors.accent,
                 shadowOpacity: glowOpacity,
-                shadowRadius: 10,
+                shadowRadius: 15,
                 shadowOffset: { width: 0, height: 0 },
               }}
-            />
-          </LinearGradient>
-          <Animated.View
-            style={{
-              shadowColor: Colors.accent,
-              shadowOpacity: glowOpacity,
-              shadowRadius: 15,
-              shadowOffset: { width: 0, height: 0 },
-            }}
-          >
-            <Image
-              source={getCoinImage()}
-              alt={selectedCoin}
-              size="2xl"
-              resizeMode="cover"
-              height={120}
-              width={120}
-              rounded={'full'}
-            />
-          </Animated.View>
-          <Text
-            fontSize="xl"
-            fontWeight="600"
-            color={Colors.text}
-            mt={4}
-          >
-            {selectedCoin}
-          </Text>
-        </Box>
+            >
+              <Image
+                source={getCoinImage()}
+                alt={selectedCoin}
+                size="2xl"
+                resizeMode="cover"
+                height={120}
+                width={120}
+                rounded={'full'}
+              />
+            </Animated.View>
+            <Text
+              fontSize="xl"
+              fontWeight="600"
+              color={Colors.text}
+              mt={4}
+            >
+              {selectedCoin}
+            </Text>
+          </Box>
 
-        <Box
-          bg={Colors.surface}
-          p={5}
-          borderRadius={12}
-          w="100%"
-          shadow={2}
-          borderWidth={1}
-          borderColor={Colors.border}
-        >
-          <Text color={Colors.text} fontSize="lg" fontWeight="600">
-            Wallet Balance
-          </Text>
-          <Text color={Colors.primary} fontSize="2xl" fontWeight="700" mt={2}>
-            {displayedMinedAmount.toFixed(8)} {selectedCoin}
-          </Text>
-        </Box>
-
-        <Box
-          bg={Colors.surface}
-          p={5}
-          borderRadius={12}
-          w="100%"
-          shadow={2}
-          borderWidth={1}
-          borderColor={Colors.border}
-        >
-          <Text color={Colors.text} fontSize="lg" fontWeight="600" mb={3}>
-            Invite Friends
-          </Text>
-          <Text color={Colors.textSecondary} fontSize="sm" mb={4}>
-            Share your referral code to earn bonus mining rewards!
-          </Text>
-          <HStack
-            bg={Colors.background}
-            borderRadius={8}
-            p={3}
-            justifyContent="space-between"
-            alignItems="center"
+          <Box
+            bg={Colors.surface}
+            p={5}
+            borderRadius={12}
+            w="100%"
+            shadow={2}
             borderWidth={1}
             borderColor={Colors.border}
           >
-            <Text color={Colors.text} fontSize="md" fontWeight="600">
-              {referralCode}
+            <Text color={Colors.text} fontSize="lg" fontWeight="600">
+              Wallet Balance
             </Text>
-            <Pressable
-              onPress={() => {
-                setIsCopied(true);
-                toast.show({
-                  description: 'Referral code copied!',
-                  duration: 2000,
-                  placement: 'top',
-                });
-                setTimeout(() => setIsCopied(false), 2000);
-              }}
-              _pressed={{ opacity: 0.7 }}
+            <Text color={Colors.primary} fontSize="2xl" fontWeight="700" mt={2}>
+              {displayedMinedAmount.toFixed(8)} {selectedCoin}
+            </Text>
+          </Box>
+
+          <Box
+            bg={Colors.surface}
+            p={5}
+            borderRadius={12}
+            w="100%"
+            shadow={2}
+            borderWidth={1}
+            borderColor={Colors.border}
+          >
+            <Text color={Colors.text} fontSize="lg" fontWeight="600" mb={3}>
+              Invite Friends
+            </Text>
+            <Text color={Colors.textSecondary} fontSize="sm" mb={4}>
+              Share your referral code to earn bonus mining rewards!
+            </Text>
+            <HStack
+              bg={Colors.background}
+              borderRadius={8}
+              p={3}
+              justifyContent="space-between"
+              alignItems="center"
+              borderWidth={1}
+              borderColor={Colors.border}
             >
-              <Box p={2} bg={Colors.primary} rounded="md">
-                <Text color={Colors.buttonText}>
-                  {isCopied ? 'Copied!' : 'Copy'}
-                </Text>
-              </Box>
-            </Pressable>
-          </HStack>
-        </Box>
-
-        <Box w="100%">
-          <Text color={Colors.text} fontSize="lg" fontWeight="600" mb={3}>
-            Recent Transactions
-          </Text>
-          <VStack space={2}>
-            {[1, 2, 3].map((_, index) => (
-              <Box
-                key={index}
-                bg={Colors.surface}
-                p={4}
-                borderRadius={12}
-                shadow={1}
-                borderWidth={1}
-                borderColor={Colors.border}
-              >
-                <HStack justifyContent="space-between" alignItems="center">
-                  <Text color={Colors.textSecondary} fontSize="sm" fontWeight="500">
-                    Mined {selectedCoin}
-                  </Text>
-                  <Text color={Colors.success} fontSize="sm" fontWeight="600">
-                    +0.00000001 {selectedCoin}
-                  </Text>
-                </HStack>
-                <Text color={Colors.muted} fontSize="xs" mt={1}>
-                  {new Date().toLocaleString()}
-                </Text>
-              </Box>
-            ))}
-          </VStack>
-        </Box>
-
-        <VStack space={4} width="100%" bg={Colors.surface} p={4} rounded="lg" shadow={2}>
-          <Text fontSize="xl" fontWeight="bold" color={Colors.text}>
-            Referral Program
-          </Text>
-
-          <VStack space={2}>
-            <Text color={Colors.text}>Your Referral Code:</Text>
-            <HStack space={2} alignItems="center">
-              <Text fontSize="lg" fontWeight="bold" color={Colors.primary}>
-                {referralCode || 'Loading...'}
+              <Text color={Colors.text} fontSize="md" fontWeight="600">
+                {referralCode}
               </Text>
               <Pressable
                 onPress={() => {
@@ -429,39 +375,103 @@ const Home = () => {
                 </Box>
               </Pressable>
             </HStack>
-          </VStack>
+          </Box>
 
-          <VStack space={2}>
-            <Text color={Colors.text}>Enter Referral Code:</Text>
-            <TextInput
-              placeholder="Enter code"
-              value={inputReferralCode}
-              onChangeText={setInputReferralCode}
-              autoCapitalize="characters"
-              style={{
-                backgroundColor: Colors.inputBackground,
-                color: Colors.text,
-                padding: 12,
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: Colors.border,
-                fontSize: 16,
-              }}
-              placeholderTextColor={Colors.textSecondary}
-            />
-            <Button
-              onPress={handleAcceptReferral}
-              isLoading={loading}
-              isLoadingText="Processing..."
-              bg={Colors.primary}
-              _pressed={{ bg: Colors.secondary }}
-            >
-              Accept Referral
-            </Button>
+          <Box w="100%">
+            <Text color={Colors.text} fontSize="lg" fontWeight="600" mb={3}>
+              Recent Transactions
+            </Text>
+            <VStack space={2}>
+              {[1, 2, 3].map((_, index) => (
+                <Box
+                  key={index}
+                  bg={Colors.surface}
+                  p={4}
+                  borderRadius={12}
+                  shadow={1}
+                  borderWidth={1}
+                  borderColor={Colors.border}
+                >
+                  <HStack justifyContent="space-between" alignItems="center">
+                    <Text color={Colors.textSecondary} fontSize="sm" fontWeight="500">
+                      Mined {selectedCoin}
+                    </Text>
+                    <Text color={Colors.success} fontSize="sm" fontWeight="600">
+                      +0.00000001 {selectedCoin}
+                    </Text>
+                  </HStack>
+                  <Text color={Colors.muted} fontSize="xs" mt={1}>
+                    {new Date().toLocaleString()}
+                  </Text>
+                </Box>
+              ))}
+            </VStack>
+          </Box>
+
+          <VStack space={4} width="100%" bg={Colors.surface} p={4} rounded="lg" shadow={2}>
+            <Text fontSize="xl" fontWeight="bold" color={Colors.text}>
+              Referral Program
+            </Text>
+
+            <VStack space={2}>
+              <Text color={Colors.text}>Your Referral Code:</Text>
+              <HStack space={2} alignItems="center">
+                <Text fontSize="lg" fontWeight="bold" color={Colors.primary}>
+                  {referralCode || 'Loading...'}
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    setIsCopied(true);
+                    toast.show({
+                      description: 'Referral code copied!',
+                      duration: 2000,
+                      placement: 'top',
+                    });
+                    setTimeout(() => setIsCopied(false), 2000);
+                  }}
+                  _pressed={{ opacity: 0.7 }}
+                >
+                  <Box p={2} bg={Colors.primary} rounded="md">
+                    <Text color={Colors.buttonText}>
+                      {isCopied ? 'Copied!' : 'Copy'}
+                    </Text>
+                  </Box>
+                </Pressable>
+              </HStack>
+            </VStack>
+
+            <VStack space={2}>
+              <Text color={Colors.text}>Enter Referral Code:</Text>
+              <TextInput
+                placeholder="Enter code"
+                value={inputReferralCode}
+                onChangeText={setInputReferralCode}
+                autoCapitalize="characters"
+                style={{
+                  backgroundColor: Colors.inputBackground,
+                  color: Colors.text,
+                  padding: 12,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  fontSize: 16,
+                }}
+                placeholderTextColor={Colors.textSecondary}
+              />
+              <Button
+                onPress={handleAcceptReferral}
+                isLoading={loading}
+                isLoadingText="Processing..."
+                bg={Colors.primary}
+                _pressed={{ bg: Colors.secondary }}
+              >
+                Accept Referral
+              </Button>
+            </VStack>
           </VStack>
         </VStack>
-      </VStack>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 

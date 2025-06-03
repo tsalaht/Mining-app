@@ -8,6 +8,7 @@ import {
   ScrollView,
   Pressable,
   useToast,
+  Spinner,
 } from 'native-base';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../../../store/store';
@@ -18,6 +19,21 @@ import Colors from '../../../Colors/Color';
 import { increaseMiningSpeed } from '../../../../store/coinSlice';
 import { upgradeService } from '../../../../app/services/api';
 
+interface UpgradePackage {
+  id: number;
+  level: number;
+  miningRate: number;
+  cost: number;
+  coin: string;
+}
+
+interface ApiPriceResponse {
+  level: number;
+  mining_rate: string;
+  price_amount: string;
+  symbol: string;
+}
+
 const Upgrade = () => {
   const dispatch = useDispatch();
   const toast = useToast();
@@ -27,10 +43,13 @@ const Upgrade = () => {
   const [glow] = useState(new Animated.Value(0));
   const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
-  const [prices, setPrices] = useState<{ [key: string]: number }>({});
+  const [prices, setPrices] = useState<ApiPriceResponse[] | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Fetch upgrade prices
     fetchUpgradePrices();
+
     // Glow animation for balance card
     Animated.loop(
       Animated.sequence([
@@ -52,21 +71,39 @@ const Upgrade = () => {
 
   const fetchUpgradePrices = async () => {
     try {
+      setLoading(true);
+      setFetchError(null);
       const response = await upgradeService.getUpgradePrice();
-      if (response && response.price) {
-        setPrices(response.price);
+      console.log('Upgrade prices response:', JSON.stringify(response, null, 2)); // Detailed debug log
+      if (response && Array.isArray(response) && response.length > 0) {
+        setPrices(response);
       } else {
-        setPrices({}); // Set empty object if no prices
+        console.warn('Invalid or empty response:', response);
+        setFetchError('No upgrade prices available');
+        setPrices([]);
+        toast.show({
+          title: 'Warning',
+          description: 'No upgrade prices available from server',
+          variant: 'solid',
+          bg: Colors.warning,
+        });
       }
-    } catch (error) {
-      console.error('Error fetching upgrade prices:', error);
-      setPrices({}); // Set empty object on error
-      toast.show({
-        title: "Error",
-        description: "Failed to fetch upgrade prices",
-        variant: "solid",
-        bg: "error.500"
+    } catch (error: any) {
+      console.error('Error fetching upgrade prices:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
       });
+      setFetchError('Failed to fetch upgrade prices');
+      setPrices([]);
+      toast.show({
+        title: 'Error',
+        description: 'Failed to fetch upgrade prices. Please try again.',
+        variant: 'solid',
+        bg: Colors.danger,
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -76,49 +113,77 @@ const Upgrade = () => {
   });
 
   const handlePurchase = async () => {
-    if (selectedPackage !== null) {
-      try {
-        setLoading(true);
-        const selected = upgradePackages.find((pkg) => pkg.id === selectedPackage);
-        if (selected) {
-          // Get the coin symbol from the selected package
-          const coinSymbol = Object.keys(prices)[selectedPackage - 1];
-          const response = await upgradeService.upgrade(coinSymbol);
-          
-          // Update mining speed in Redux
-          dispatch(increaseMiningSpeed(miningSpeed + selected.speed));
-          
+    if (selectedPackage === null) {
+      toast.show({
+        title: 'Error',
+        description: 'Please select an upgrade package',
+        variant: 'solid',
+        bg: Colors.danger,
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const selected = upgradePackages.find((pkg) => pkg.id === selectedPackage);
+      if (selected) {
+        if (selected.cost > minedAmount) {
           toast.show({
-            title: "Success",
-            description: `Upgraded successfully! New level: ${response.level}`,
-            variant: "solid",
-            bg: "success.500"
+            title: 'Error',
+            description: 'Insufficient balance for this upgrade',
+            variant: 'solid',
+            bg: Colors.danger,
           });
-          
-          setSelectedPackage(null); // Reset selection
-          await fetchUpgradePrices(); // Refresh prices
+          return;
         }
-      } catch (error) {
-        console.error('Error upgrading:', error);
+
+        const response = await upgradeService.upgrade(selected.coin);
+        dispatch(increaseMiningSpeed(miningSpeed + selected.miningRate));
+
         toast.show({
-          title: "Error",
-          description: "Failed to upgrade. Please try again.",
-          variant: "solid",
-          bg: "error.500"
+          title: 'Success',
+          description: `Upgraded successfully! New level: ${response.level}`,
+          variant: 'solid',
+          bg: Colors.success,
         });
-      } finally {
-        setLoading(false);
+
+        setSelectedPackage(null);
+        await fetchUpgradePrices(); // Refresh prices
       }
+    } catch (error: any) {
+      console.error('Error upgrading:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      toast.show({
+        title: 'Error',
+        description: error.message || 'Failed to upgrade. Please try again.',
+        variant: 'solid',
+        bg: Colors.danger,
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Convert prices to upgrade packages with null check
-  const upgradePackages = prices ? Object.entries(prices).map(([coin, price], index) => ({
-    id: index + 1,
-    speed: 10 * (index + 1), // Increase speed with each level
-    cost: price,
-    coin: coin
-  })) : [];
+  // Construct upgrade packages from prices
+  const upgradePackages: UpgradePackage[] = prices
+    ? prices.map((item, index) => {
+        // Ensure item has required fields
+        if (!item?.level || !item?.mining_rate || !item?.price_amount || !item?.symbol) {
+          console.warn('Invalid price item:', item);
+          return null;
+        }
+        return {
+          id: index + 1,
+          level: item.level,
+          miningRate: parseFloat(item.mining_rate) || 0,
+          cost: parseFloat(item.price_amount) || 0,
+          coin: item.symbol,
+        };
+      }).filter((pkg): pkg is UpgradePackage => pkg !== null) // Remove null entries
+    : [];
 
   return (
     <ScrollView flex={1} bg={Colors.background}>
@@ -193,58 +258,72 @@ const Upgrade = () => {
           <Text color={Colors.text} fontSize="lg" fontWeight="600" mb={3}>
             Available Upgrades
           </Text>
-          <VStack space={3}>
-            {upgradePackages.map((pkg) => (
-              <Pressable
-                key={pkg.id}
-                onPress={() => setSelectedPackage(pkg.id)}
-                _pressed={{ opacity: 0.7 }}
-              >
-                <Box
-                  bg={Colors.surface}
-                  p={4}
-                  borderRadius={12}
-                  shadow={2}
-                  borderWidth={2}
-                  borderColor={
-                    selectedPackage === pkg.id
-                      ? Colors.accent
-                      : Colors.border
-                  }
+          {loading ? (
+            <VStack alignItems="center" py={4}>
+              <Spinner color={Colors.primary} size="lg" />
+              <Text color={Colors.text} mt={2}>
+                Loading upgrade packages...
+              </Text>
+            </VStack>
+          ) : fetchError ? (
+            <Text color={Colors.danger} textAlign="center">
+              {fetchError}
+            </Text>
+          ) : upgradePackages.length === 0 ? (
+            <Text color={Colors.textSecondary} textAlign="center">
+              No upgrade packages available
+            </Text>
+          ) : (
+            <VStack space={3}>
+              {upgradePackages.map((pkg) => (
+                <Pressable
+                  key={pkg.id}
+                  onPress={() => setSelectedPackage(pkg.id)}
+                  _pressed={{ opacity: 0.7 }}
                 >
-                  <HStack justifyContent="space-between" alignItems="center">
-                    <VStack>
-                      <Text
-                        fontSize="md"
-                        fontWeight="600"
-                        color={Colors.text}
-                      >
-                        {pkg.speed} GH/s
-                      </Text>
-                      <Text
-                        fontSize="sm"
-                        color={Colors.textSecondary}
-                      >
-                        Boost your mining power
-                      </Text>
-                    </VStack>
-                    <VStack alignItems="flex-end">
-                      <Text
-                        fontSize="md"
-                        fontWeight="600"
-                        color={Colors.primary}
-                      >
-                        {pkg.cost} {pkg.coin}
-                      </Text>
-                      <Text fontSize="xs" color={Colors.success}>
-                        One-time purchase
-                      </Text>
-                    </VStack>
-                  </HStack>
-                </Box>
-              </Pressable>
-            ))}
-          </VStack>
+                  <Box
+                    bg={Colors.surface}
+                    p={4}
+                    borderRadius={12}
+                    shadow={2}
+                    borderWidth={2}
+                    borderColor={
+                      selectedPackage === pkg.id
+                        ? Colors.accent
+                        : Colors.border
+                    }
+                  >
+                    <HStack justifyContent="space-between" alignItems="center">
+                      <VStack>
+                        <Text
+                          fontSize="md"
+                          fontWeight="600"
+                          color={Colors.text}
+                        >
+                          Level {pkg.level} (+{pkg.miningRate} GH/s)
+                        </Text>
+                        <Text fontSize="sm" color={Colors.textSecondary}>
+                          Boost your mining power
+                        </Text>
+                      </VStack>
+                      <VStack alignItems="flex-end">
+                        <Text
+                          fontSize="md"
+                          fontWeight="600"
+                          color={Colors.primary}
+                        >
+                          {pkg.cost.toFixed(8)} {pkg.coin}
+                        </Text>
+                        <Text fontSize="xs" color={Colors.success}>
+                          One-time purchase
+                        </Text>
+                      </VStack>
+                    </HStack>
+                  </Box>
+                </Pressable>
+              ))}
+            </VStack>
+          )}
         </Box>
 
         {/* Purchase Button */}
@@ -271,12 +350,12 @@ const Upgrade = () => {
                 as={MaterialCommunityIcons}
                 name="cart"
                 size={6}
-                color={Colors.inputBackground}
+                color={Colors.buttonText}
               />
               <Text
                 fontSize="lg"
                 fontWeight="600"
-                color={Colors.inputBackground}
+                color={Colors.buttonText}
               >
                 {loading ? 'Processing...' : 'Purchase Upgrade'}
               </Text>

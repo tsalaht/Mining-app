@@ -7,6 +7,8 @@ import {
   Icon,
   ScrollView,
   Pressable,
+  useToast,
+  Spinner,
 } from 'native-base';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../../store/store';
@@ -14,14 +16,39 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Animated, Easing } from 'react-native';
 import Colors from '../../../Colors/Color';
+import { useNavigation } from '@react-navigation/native';
+import { walletService } from '../../../../app/services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import  api  from '../../../services/api';
+
+interface WalletCoin {
+  symbol: string;
+  balance: string;
+}
+
+interface Transaction {
+  id: number;
+  type: string;
+  amount: string;
+  date: string;
+  status: string;
+}
 
 const Wallet = () => {
-  const { selectedCoin, minedAmount } = useSelector(
-    (state: RootState) => state.coin
-  );
+  const navigation = useNavigation<any>();
+  const toast = useToast();
+  const { selectedCoin } = useSelector((state: RootState) => state.coin);
   const [glow] = useState(new Animated.Value(0));
+  const [walletData, setWalletData] = useState<WalletCoin[] | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Fetch wallet data and transactions
+    fetchWalletData();
+    // fetchTransactions(); // Uncomment when transaction endpoint is available
+
     // Glow animation for balance card
     Animated.loop(
       Animated.sequence([
@@ -41,31 +68,105 @@ const Wallet = () => {
     ).start();
   }, []);
 
+  const fetchWalletData = async () => {
+    try {
+      setLoading(true);
+      setFetchError(null);
+      const response = await walletService.getWallet();
+      console.log('Wallet response:', response);
+      if (response && response.coins && Array.isArray(response.coins)) {
+        setWalletData(response.coins);
+      } else {
+        setWalletData([]);
+        setFetchError('No wallet data available');
+        toast.show({
+          title: 'Warning',
+          description: 'No wallet data available from server',
+          variant: 'solid',
+          bg: Colors.warning,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error fetching wallet data:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      setFetchError('Failed to fetch wallet data');
+      setWalletData([]);
+      toast.show({
+        title: 'Error',
+        description: 'Failed to fetch wallet data. Please try again.',
+        variant: 'solid',
+        bg: Colors.danger,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Placeholder for fetching transactions (to be implemented when endpoint is available)
+  const fetchTransactions = async () => {
+    try {
+      // Hypothetical endpoint: /wallet/transactions
+      const response = await api.get('/wallet/transactions', {
+        headers: {
+          Authorization: `Bearer ${await AsyncStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      console.log('Transactions response:', response.data);
+      if (response.data && Array.isArray(response.data)) {
+        setTransactions(response.data);
+      } else {
+        setTransactions([]);
+      }
+    } catch (error: any) {
+      console.error('Error fetching transactions:', error);
+      setTransactions([]);
+    }
+  };
+
   const glowOpacity = glow.interpolate({
     inputRange: [0.3, 1],
     outputRange: [0.2, 0.8],
   });
 
-  // Sample transaction data
-  const transactions = [
+  // Get balance for the selected coin
+  const balance = walletData
+    ? parseFloat(
+        walletData.find((coin) => coin.symbol === selectedCoin)?.balance || '0'
+      )
+    : 0;
+
+  // Mock conversion rate for USD (replace with real API data if available)
+  const usdConversionRate: { [key: string]: number } = {
+    BTC: 50000,
+    ETH: 3000,
+    BTS: 0.1,
+    JHS: 0.05,
+  };
+
+  // Sample transactions until backend provides real data
+  const sampleTransactions: Transaction[] = [
     {
       id: 1,
       type: 'Mined',
-      amount: 0.00000001,
+      amount: '0.00000001',
       date: new Date().toLocaleString(),
       status: 'success',
     },
     {
       id: 2,
       type: 'Deposit',
-      amount: 0.00005,
+      amount: '0.00005',
       date: new Date(Date.now() - 86400000).toLocaleString(),
       status: 'success',
     },
     {
       id: 3,
       type: 'Withdraw',
-      amount: 0.00002,
+      amount: '0.00002',
       date: new Date(Date.now() - 2 * 86400000).toLocaleString(),
       status: 'pending',
     },
@@ -95,60 +196,75 @@ const Wallet = () => {
         </LinearGradient>
 
         {/* Wallet Balance Card */}
-        <Animated.View
-          style={{
-            width: '100%',
-            shadowColor: Colors.accent,
-            shadowOpacity: glowOpacity,
-            shadowRadius: 15,
-            shadowOffset: { width: 0, height: 0 },
-          }}
-        >
-          <LinearGradient
-            colors={[Colors.primary, Colors.secondary]}
+        {loading ? (
+          <VStack alignItems="center" py={4}>
+            <Spinner color={Colors.primary} size="lg" />
+            <Text color={Colors.text} mt={2}>
+              Loading wallet data...
+            </Text>
+          </VStack>
+        ) : fetchError ? (
+          <Text color={Colors.danger} textAlign="center">
+            {fetchError}
+          </Text>
+        ) : (
+          <Animated.View
             style={{
-              borderRadius: 16,
-              padding: 20,
-              alignItems: 'center',
-              borderWidth: 1,
-              borderColor: Colors.border,
+              width: '100%',
+              shadowColor: Colors.accent,
+              shadowOpacity: glowOpacity,
+              shadowRadius: 15,
+              shadowOffset: { width: 0, height: 0 },
             }}
           >
-            <HStack alignItems="center" space={2}>
-              <Icon
-                as={MaterialCommunityIcons}
-                name={
-                  selectedCoin === 'BTC'
-                    ? 'bitcoin'
-                    : selectedCoin === 'ETH'
-                    ? 'ethereum'
-                    : 'currency-usd'
-                }
-                size={10}
-                color={Colors.buttonText}
-              />
-              <Text fontSize="xl" fontWeight="600" color={Colors.buttonText}>
-                {selectedCoin} Balance
-              </Text>
-            </HStack>
-            <Text
-              fontSize="3xl"
-              fontWeight="700"
-              color={Colors.buttonText  }
-              mt={2}
+            <LinearGradient
+              colors={[Colors.primary, Colors.secondary]}
+              style={{
+                borderRadius: 16,
+                padding: 20,
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: Colors.border,
+              }}
             >
-              {minedAmount.toFixed(8)} {selectedCoin}
-            </Text>
-            <Text fontSize="sm" color={Colors.inputBackground} mt={1}>
-              ≈ ${(minedAmount * 50000).toFixed(2)} USD
-            </Text>
-          </LinearGradient>
-        </Animated.View>
+              <HStack alignItems="center" space={2}>
+                <Icon
+                  as={MaterialCommunityIcons}
+                  name={
+                    selectedCoin === 'BTC'
+                      ? 'bitcoin'
+                      : selectedCoin === 'ETH'
+                      ? 'ethereum'
+                      : selectedCoin === 'BTS' || selectedCoin === 'JHS'
+                      ? 'currency-usd' // Placeholder icon for BTS/JHS
+                      : 'currency-usd'
+                  }
+                  size={10}
+                  color={Colors.buttonText}
+                />
+                <Text fontSize="xl" fontWeight="600" color={Colors.buttonText}>
+                  {selectedCoin} Balance
+                </Text>
+              </HStack>
+              <Text
+                fontSize="2xl"
+                fontWeight="700"
+                color={Colors.buttonText}
+                mt={2}
+              >
+                {balance.toFixed(8)} {selectedCoin}
+              </Text>
+              <Text fontSize="sm" color={Colors.inputBackground} mt={1}>
+                ≈ ${(balance * (usdConversionRate[selectedCoin] || 1)).toFixed(2)} USD
+              </Text>
+            </LinearGradient>
+          </Animated.View>
+        )}
 
         {/* Action Buttons */}
         <HStack space={4} w="100%" justifyContent="center">
           <Pressable
-            onPress={() => console.log('Deposit pressed')}
+            onPress={() => navigation.navigate('Deposit')}
             _pressed={{ opacity: 0.7 }}
             flex={1}
           >
@@ -173,7 +289,7 @@ const Wallet = () => {
             </Box>
           </Pressable>
           <Pressable
-            onPress={() => console.log('Withdraw pressed')}
+            onPress={() => navigation.navigate('Withdraw')}
             _pressed={{ opacity: 0.7 }}
             flex={1}
           >
@@ -205,7 +321,7 @@ const Wallet = () => {
             Recent Transactions
           </Text>
           <VStack space={3}>
-            {transactions.map((tx) => (
+            {(transactions.length > 0 ? transactions : sampleTransactions).map((tx) => (
               <Box
                 key={tx.id}
                 bg={Colors.surface}
@@ -217,11 +333,7 @@ const Wallet = () => {
               >
                 <HStack justifyContent="space-between" alignItems="center">
                   <VStack>
-                    <Text
-                      fontSize="md"
-                      fontWeight="600"
-                      color={Colors.text}
-                    >
+                    <Text fontSize="md" fontWeight="600" color={Colors.text}>
                       {tx.type} {selectedCoin}
                     </Text>
                     <Text fontSize="xs" color={Colors.muted}>
@@ -232,22 +344,14 @@ const Wallet = () => {
                     <Text
                       fontSize="md"
                       fontWeight="600"
-                      color={
-                        tx.type === 'Withdraw'
-                          ? Colors.danger
-                          : Colors.success
-                      }
+                      color={tx.type === 'Withdraw' ? Colors.danger : Colors.success}
                     >
                       {tx.type === 'Withdraw' ? '-' : '+'}
-                      {tx.amount.toFixed(8)} {selectedCoin}
+                      {parseFloat(tx.amount).toFixed(8)} {selectedCoin}
                     </Text>
                     <Text
                       fontSize="xs"
-                      color={
-                        tx.status === 'success'
-                          ? Colors.success
-                          : Colors.warning
-                      }
+                      color={tx.status === 'success' ? Colors.success : Colors.warning}
                     >
                       {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
                     </Text>
