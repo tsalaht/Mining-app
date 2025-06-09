@@ -15,8 +15,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Animated, Easing } from 'react-native';
 import Colors from '../../../Colors/Color';
 import { useNavigation } from '@react-navigation/native';
+import { useDispatch } from 'react-redux'; // Add this import for Redux dispatch
 import { userService, walletService } from '../../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setPassHome } from '../../../../store/PassHomeSlice';
 
 interface UserProfile {
   username: string;
@@ -32,6 +34,7 @@ interface UserProfile {
 const ProfileScreen = () => {
   const [glow] = useState(new Animated.Value(0));
   const navigation: any = useNavigation();
+  const dispatch = useDispatch(); // Initialize dispatch
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<UserProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +50,6 @@ const ProfileScreen = () => {
       setLoading(true);
       setError(null);
 
-      // Check if we have a token
       const token = await AsyncStorage.getItem('token');
       console.log('Current token status:', !!token);
 
@@ -62,19 +64,13 @@ const ProfileScreen = () => {
 
       console.log('Fetching profile data...');
       const profileData = await userService.getProfile();
-
-
- 
       const walletData = await walletService.getWallet();
- 
 
       setUserData({
         ...profileData,
         coins: walletData.coins || [],
       });
- 
     } catch (err) {
-      
       setError('Failed to load profile data. Please try again.');
     } finally {
       setLoading(false);
@@ -82,15 +78,22 @@ const ProfileScreen = () => {
   };
 
   const handleRetry = () => {
-  
-    setRetryCount(prev => prev + 1);
+    setRetryCount((prev) => prev + 1);
   };
 
   const handleLogout = async () => {
     try {
       console.log('Logging out...');
+      // Remove token and user data from AsyncStorage
       await AsyncStorage.removeItem('token');
-      console.log('Token removed');
+      await AsyncStorage.removeItem('userData');
+      console.log('Token and user data removed from AsyncStorage');
+
+      // Set passHome to false in Redux store
+      dispatch(setPassHome(false));
+      console.log('passHome set to false');
+
+      // Reset navigation to Login screen
       navigation.reset({
         index: 0,
         routes: [{ name: 'Login' }],

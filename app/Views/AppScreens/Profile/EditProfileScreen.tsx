@@ -248,7 +248,7 @@ const EditProfileScreen = () => {
           </LinearGradient>
         </Pressable>
 
-        {/* Delete Account Button */}
+
         <Button
           onPress={handleDeleteAccount}
           bg={Colors.danger}
