@@ -46,13 +46,49 @@ const PolicyScreen = () => {
             Our Commitment to Privacy
           </Text>
           <Text fontSize="md" color={Colors.textSecondary} lineHeight="lg">
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+            Welcome to our Cryptocurrency Mining App. This privacy policy explains how we collect, use, and protect your information while you use our mining platform.
             {'\n\n'}
-            Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+            Information We Collect:
+            {'\n'}
+            • Account Information: Email, username, and password
+            {'\n'}
+            • Mining Data: Mining rates, coin balances, and transaction history
+            {'\n'}
+            • Device Information: Device type, operating system, and app usage statistics
             {'\n\n'}
-            We collect personal information such as your name, email, and profile image to provide a personalized experience. Your data is securely stored and never shared with third parties without your consent.
+            How We Use Your Information:
+            {'\n'}
+            • To provide and maintain our mining services
+            {'\n'}
+            • To process your mining rewards and transactions
+            {'\n'}
+            • To improve our app's performance and user experience
+            {'\n'}
+            • To communicate important updates about our services
             {'\n\n'}
-            For more details, please contact our support team at support@example.com.
+            Data Security:
+            {'\n'}
+            We implement industry-standard security measures to protect your personal information and mining data. Your mining rewards and transactions are secured using advanced encryption technologies.
+            {'\n\n'}
+            Mining and Rewards:
+            {'\n'}
+            • Mining rates and rewards are calculated based on your account level and mining speed
+            {'\n'}
+            • All mining transactions are recorded on the blockchain
+            {'\n'}
+            • Rewards are distributed according to our mining algorithm
+            {'\n\n'}
+            Your Rights:
+            {'\n'}
+            • Access your mining data and transaction history
+            {'\n'}
+            • Update your account information
+            {'\n'}
+            • Withdraw your mining rewards
+            {'\n'}
+            • Delete your account and associated data
+            {'\n\n'}
+            For any questions about our privacy policy or mining services, please contact our support team at support@crypt0.rayyehbalak.com
           </Text>
         </Box>
       </VStack>
