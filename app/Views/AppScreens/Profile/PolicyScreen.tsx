@@ -46,7 +46,7 @@ const PolicyScreen = () => {
             Our Commitment to Privacy
           </Text>
           <Text fontSize="md" color={Colors.textSecondary} lineHeight="lg">
-            Welcome to our Cryptocurrency Mining App. This privacy policy explains how we collect, use, and protect your information while you use our mining platform.
+            Welcome to our Cryptocurrency Nexa clicker App. This privacy policy explains how we collect, use, and protect your information while you use our mining platform.
             {'\n\n'}
             Information We Collect:
             {'\n'}
@@ -72,7 +72,7 @@ const PolicyScreen = () => {
             {'\n\n'}
             Mining and Rewards:
             {'\n'}
-            • Mining rates and rewards are calculated based on your account level and mining speed
+            • Nexa clicker rates and rewards are calculated based on your account level and mining speed
             {'\n'}
             • All mining transactions are recorded on the blockchain
             {'\n'}
@@ -88,7 +88,7 @@ const PolicyScreen = () => {
             {'\n'}
             • Delete your account and associated data
             {'\n\n'}
-            For any questions about our privacy policy or mining services, please contact our support team at support@crypt0.rayyehbalak.com
+            For any questions about our privacy policy or Nexa clicker services, please contact our support team at support@crypt0.rayyehbalak.com
           </Text>
         </Box>
       </VStack>

@@ -102,7 +102,7 @@ const Coins = () => {
                 onLoad={() => {
                   console.log('Image loaded successfully for coin:', coin.name);
                 }}
-                fallbackSource={require('../../../assets/Coins/Bitcoin.jpg')}
+                fallbackSource={require('../../../assets/Coins/Nexa.jpg')}
               />
               <Text
                 color="white"

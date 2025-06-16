@@ -130,7 +130,7 @@ const Upgrade = () => {
         if (selected.cost > minedAmount) {
           toast.show({
             title: 'Error',
-            description: 'Insufficient balance for this upgrade',
+            description: 'Insufficient your score for this upgrade',
             variant: 'solid',
             bg: Colors.danger,
           });

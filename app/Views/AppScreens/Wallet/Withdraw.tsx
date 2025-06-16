@@ -52,7 +52,7 @@ const Withdraw = () => {
         }}
       >
         <Text fontSize="2xl" fontWeight="700" color={Colors.buttonText}>
-          Withdraw {selectedCoin}
+        Collected Energy {selectedCoin}
         </Text>
       </LinearGradient>
 
